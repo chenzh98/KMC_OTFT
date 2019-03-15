@@ -72,10 +72,12 @@ def vab(carrier_3d, potential_3d, a, b):
     elif b[2] < t_ox - 1:
         return 0
     elif Eb > Ea:
-        return math.exp(-10*math.sqrt((b[0]-a[0])**2+(b[1]-a[1])**2+(b[2]-a[2])**2)-
-                   q*(Eb-Ea)/(kB*T))
+        return math.exp(-10*math.sqrt((b[0]-a[0])**2+
+                                      (b[1]-a[1])**2+(b[2]-a[2])**2)-
+                                      q*(Eb-Ea)/(kB*T))
     else:
-        return math.exp(-10*math.sqrt((b[0]-a[0])**2+(b[1]-a[1])**2+(b[2]-a[2])**2))
+        return math.exp(-10*math.sqrt((b[0]-a[0])**2+
+                                      (b[1]-a[1])**2+(b[2]-a[2])**2))
 #--------------------------------------------------------------------------#
 #Given a point, get the vij to all 26 directions at the point
 def v_all_dirt(carrier_3d, potential_3d, x, y, z):
@@ -256,7 +258,7 @@ def hopping(carrier_3d, potential_3d):
         i += 1       
     carrier_3d[hop_ini[0], hop_ini[1], hop_ini[2]] = 0
     carrier_3d[hop_finl[0], hop_finl[1], hop_finl[2]] = 1 
-    
+# the boundary of carrier_3d would be set again later.
     sys_time += rt_min 
     time_counter += 1
     if rt_min == 1000: 
@@ -270,7 +272,7 @@ potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num
 q_num = np.zeros((len_z, len_y))
 # define the source/drain.
 #1 means a carrier occupied the lattice point. 0 means no carrier
-carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 
+carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
 #Vd = -10V, Vs = 0, Vg = -10V, other boundary values are 0
 #Use finite difference to solve the potential(y,z)
 #Since the boundary potential is given, we need to calc a (30-2)x(200-2) matrix
@@ -339,7 +341,7 @@ while time_counter <= set_time:# set the running time of the simulation
     #Once a charge carrier reaches drain, the charge would be removed.
     if hop_finl[1] == 0:
         current_counter += 1
-    carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1
+    carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Set the boundary again
     carrier_3d[:, 0, t_ox-1:len_z-1] = 0
     current = current_counter*q/sys_time 
     if time_counter == set_time//10 \
