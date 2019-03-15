@@ -55,7 +55,7 @@ def visualize(c_3d):
     ax.set_ylabel('Y')
     ax.set_xlabel('X')
     plt.show()
-    plt.savefig('carrier'+ str(time_counter) + '.png')
+#    plt.savefig('carrier'+ str(time_counter) + '.png')
 def show_mat(Z):
     fig, ax = plt.subplots()
     im = ax.imshow(Z, origin='lower')
@@ -268,10 +268,13 @@ def hopping(carrier_3d, potential_3d):
 #-------------------------------------------------------------#
 set_time = int(input('Please input set_time:'))
 time_counter = int(input('Please input time_counter:'))
-carrier_3d = np.load("carrier_3d_" + str(time_counter) + ".npy")
-potential_3d = np.load("potential_3d_" + str(time_counter) + ".npy")
-potential_2d = np.load("potential_2d_" + str(time_counter) + ".npy")
-q_num = np.load("q_num_" + str(time_counter) + ".npy")
+carrier_3d = np.load("E:\py_work\KMC_data\carrier_3d_" + \
+                     str(time_counter) + ".npy")
+potential_3d = np.load("E:\py_work\KMC_data\potential_3d_" + \
+                       str(time_counter) + ".npy")
+potential_2d = np.load("E:\py_work\KMC_data\potential_2d_" + \
+                       str(time_counter) + ".npy")
+q_num = np.load("E:\py_work\KMC_data\q_num_" + str(time_counter) + ".npy")
 pot_record = []
 #start hopping
 while time_counter <= set_time:# set the running time of the simulation

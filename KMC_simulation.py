@@ -53,7 +53,7 @@ def visualize(c_3d):
     ax.set_ylabel('Y')
     ax.set_xlabel('X')
     plt.show()
-    plt.savefig('carrier'+ str(time_counter) + '.png')
+#    plt.savefig('carrier'+ str(time_counter) + '.png')
 def show_mat(Z):
     fig, ax = plt.subplots()
     im = ax.imshow(Z, origin='lower')
