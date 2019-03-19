@@ -11,7 +11,7 @@ import datetime
 begin = datetime.datetime.now()
 sys_time = 0
 time_counter = 0
-set_time = 200000  #set the running time, 1000 times hopping
+set_time = 200  #set the running time, 1000 times hopping
 current_counter = 0
 #-------------------------------------------------------------#
 #define the constants
@@ -222,11 +222,13 @@ def single_charge_pot(y, z):
 #Hopping change carrier_3d and system time.
 #Potential_3d won't be update in this function.
 #One charge is hopping.
-def hopping(carrier_3d, potential_3d):  
+def hopping():  
     global sys_time
     global time_counter
     global hop_ini
     global hop_finl
+    global carrier_3d
+    global potential_3d
     rt_min = 1000
     x = 0
     while x < np.shape(carrier_3d)[0]:
@@ -321,13 +323,14 @@ while i < (len_z-1):
     potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
     i += 1
 boundary_pot(potential_2d)
-show_mat(potential_2d)
-visualize(carrier_3d)
+#show_mat(potential_2d)
+#---------------------------------------------------------------------------------------------
+#visualize(carrier_3d)
 update_pot(potential_2d, potential_3d)
 pot_record = []
 #start hopping
 while time_counter <= set_time:# set the running time of the simulation
-    hopping(carrier_3d, potential_3d) 
+    hopping() 
     if (hop_finl[1]>0) and (hop_finl[2]<(len_z-1)) and (hop_finl[2]>(t_ox-1)):
         q_num[hop_finl[2], hop_finl[1]] += 1
         potential_2d += single_charge_pot(hop_finl[1], hop_finl[2])
@@ -349,12 +352,12 @@ while time_counter <= set_time:# set the running time of the simulation
     or time_counter == set_time//2 \
     or time_counter == set_time - 1:
         pot_record.append(potential_2d)
-        show_mat(potential_2d)
-        plt.savefig('potential'+ str(time_counter) + '.png')
-        visualize(carrier_3d)
+        #show_mat(potential_2d)
+        #plt.savefig('potential'+ str(time_counter) + '.png')
+        #visualize(carrier_3d)
 #--------------------------------------------------------------------#
 end = datetime.datetime.now()
-print(end - begin)        
+print("Runtime: %0.4f", end - begin)      
             
         
 
