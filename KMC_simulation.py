@@ -22,7 +22,8 @@ q = 1.6e-19  #elemental charge
 lat_c = 1e-9   #lattice constant
 kB = 1.38e-23
 T = 300
-Pi = 3.1415927
+#Pi = 3.1415927
+v0 = 1e12
 # The scale of the simulation 200nm*30nm*200nm
 t_ox = 5
 t_semi = 10
@@ -69,7 +70,7 @@ def vab(carrier_3d, potential_3d, a, b):
     Eb = potential_3d[b[0], b[1], b[2]]
     if carrier_3d[b[0], b[1], b[2]] > 0:
         return 0
-    elif b[2] < t_ox - 1:
+    elif b[2] < t_ox :
         return 0
     elif Eb > Ea:
         return math.exp(-10*math.sqrt((b[0]-a[0])**2+
@@ -81,7 +82,7 @@ def vab(carrier_3d, potential_3d, a, b):
 #--------------------------------------------------------------------------#
 #Given a point, get the vij to all 26 directions at the point
 def v_all_dirt(carrier_3d, potential_3d, x, y, z):
-    v = []
+    v = []#v is all probabilities(vij). dirtn is the corresponding direction.
     dirtn = []
     if x-1 >= 0:
         v.append(vab(carrier_3d, potential_3d, 
@@ -195,16 +196,17 @@ def v_all_dirt(carrier_3d, potential_3d, x, y, z):
 def update_pot(potential_2d, potential_3d):
     i = 0
     while i < len_x:
-        potential_3d[i] = potential_2d.T #cuz I get the wrong y and z below
+        potential_3d[i] = potential_2d.T #cuz I mix z and y when calculating potential_2d
         i += 1
+    return potential_3d
 #--------------------------------------------------------------------#
 def boundary_pot(potential_2d):
     potential_2d[0] = -10
     potential_2d[t_ox:len_z, 0] = -10
     potential_2d[t_ox:len_z, len_y-1] = 0   
+    return potential_2d
 #---------------------------------------------------------------------#
 def single_charge_pot(y, z):
-    global len_z, len_y, q
     potential = np.zeros((len_z, len_y))
     for i in range(0, len_z):
         for j in range(0, len_y):
@@ -213,10 +215,10 @@ def single_charge_pot(y, z):
             else:
                 if i <= 4:
                     potential[i, j] = \
-                    q/(4*Pi*epsilon0*epsilon_ox)/math.sqrt((i-z)**2+(j-y)**2)
+                    q/(4*np.pi*epsilon0*epsilon_ox)/math.sqrt((i-z)**2+(j-y)**2)
                 else:
                     potential[i, j] = \
-                    q/(4*Pi*epsilon0*epsilon_s)/math.sqrt((i-z)**2+(j-y)**2)
+                    q/(4*np.pi*epsilon0*epsilon_s)/math.sqrt((i-z)**2+(j-y)**2)
     return potential
 #----------------------------------------------------------------------#
 #Hopping change carrier_3d and system time.
@@ -229,7 +231,7 @@ def hopping():
     global hop_finl
     global carrier_3d
     global potential_3d
-    rt_min = 1000
+    rt_min = 1000#1000 is meaningless. Just a large enough name to start
     x = 0
     while x < np.shape(carrier_3d)[0]:
         y = 0
@@ -239,7 +241,7 @@ def hopping():
                 if carrier_3d[x, y, z] == 1:
                     v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)
                     if v.sum() > 0:
-                        rt_i = -math.log(random.random())/v.sum()
+                        rt_i = -math.log(random.random())/v.sum()/v0
                         if rt_i < rt_min:
                             rt_min = rt_i
                             v_hop = v
@@ -253,7 +255,7 @@ def hopping():
     rdm2 = random.random()
     i = 0
     while i < len(v_hop):
-        if (rdm2 > v_hop[:i].sum()/v_hop.sum())&\
+        if (rdm2 > v_hop[:i].sum()/v_hop.sum()) and\
             (rdm2 <= v_hop[:i+1].sum()/v_hop.sum()):
                 hop_finl = np.array(dirt_hop[i], dtype = int)
                 break
@@ -270,8 +272,8 @@ def hopping():
 #-------------------------------------------------------------------#        
 carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
 potential_3d = np.zeros((len_x, len_y, len_z))
-potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num
-q_num = np.zeros((len_z, len_y))
+potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num. For the convenience of computation below.
+q_num = np.zeros((len_z, len_y), dtype = int)
 # define the source/drain.
 #1 means a carrier occupied the lattice point. 0 means no carrier
 carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
@@ -322,11 +324,11 @@ i = 1
 while i < (len_z-1):
     potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
     i += 1
-boundary_pot(potential_2d)
+potential_2d = boundary_pot(potential_2d)
 #show_mat(potential_2d)
 #---------------------------------------------------------------------------------------------
 #visualize(carrier_3d)
-update_pot(potential_2d, potential_3d)
+potential_3d = update_pot(potential_2d, potential_3d)
 pot_record = []
 #start hopping
 while time_counter <= set_time:# set the running time of the simulation
@@ -337,8 +339,8 @@ while time_counter <= set_time:# set the running time of the simulation
     if (hop_ini[1]<(len_y-1)) and (hop_ini[2]<(len_z-1)):
         q_num[hop_ini[2], hop_ini[1]] -= 1
         potential_2d -= single_charge_pot(hop_ini[1], hop_ini[2])
-    boundary_pot(potential_2d)
-    update_pot(potential_2d, potential_3d)
+    potential_2d = boundary_pot(potential_2d)
+    potential_3d = update_pot(potential_2d, potential_3d)
     #Now consider source and drain current
     #Once a charge carrier leaves source, the empty site would be refilled.
     #Once a charge carrier reaches drain, the charge would be removed.
