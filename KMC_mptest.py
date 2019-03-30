@@ -11,7 +11,7 @@ import math
 import random 
 from scipy.linalg import solve
 import multiprocessing as mp
-from multiprocessing import Pool
+from multiprocessing import Pool, sharedctypes
 import time
 #-----------------------------------------------------------------------------------
 #define the constants
@@ -228,12 +228,14 @@ def single_charge_pot(y, z):
     #Here what we need is the minimum rt, and corresponding site ordinates
     #
 def hopping_x_section(x):
-    global carrier_3d
-    global potential_3d
+    carrier_3d = np.ctypeslib.as_array(c-carrier)
+    potential_3d = np.ctypeslib.as_array(c-potential)
     global t_ox
     #1000 is meaningless. Just a large enough number to start.
     #rt means resident time
-    #v is the probability(vij), dirt is corresponding dirction    
+    #v is the probability(vij), dirt is corresponding dirction
+    print("enter child process!!!")
+    visualize(carrier_3d)
     rt_min = 1000
     y = 0
     while y < np.shape(carrier_3d)[1]:
@@ -252,7 +254,14 @@ def hopping_x_section(x):
             z += 1
         y += 1
     return rt_min, hop_site
-    print("enter child process!!!")
+    #print("enter child process!!!")
+#_init function is for array sharing
+def _init(carrier, potential):
+    global c_carrier
+    global c_potential
+    c_carrier = carrier
+    c_potential = potential
+#---------------------------------------------------------------------------#
 #In the end, only the minimum resident time and coresponding hopping site are 
 #recorded in site_record.
 #The following functions is for the callback in the pool.
@@ -262,53 +271,6 @@ def paral_site_record(rt_and_site):
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     print(site_record)
     print("Above is site_record!!!!!!!!")
-#---------------------------------------------------------------------------#
-    #Hopping change carrier_3d and system time.
-    #Potential_3d won't be update in this function.
-    #One charge is hopping.
-def hopping():  
-    global sys_time
-    global time_counter
-    global hop_ini
-    global hop_finl
-    global carrier_3d
-    global potential_3d
-    global rt_queue
-    global len_x
-    global site_record
-    global cores
-    rt_min = 1000#1000 is meaningless. Just a large enough number to start.
-    p = Pool(None)
-    for x in range(len_x):
-        p.apply_async(hopping_x_section, args=(x,), callback=paral_site_record)
-    p.close()
-    p.join()
-    print("signal 1")
-    for rt_and_site in site_record:
-        if rt_and_site[0] < rt_min:
-            rt_min = rt_and_site[0]
-            hop_ini = rt_and_site[1]
-    #Above process finds the carrier that hops. 
-    #And the probabilities to all 26 directions respectively. 
-    #Yet we still need the hopping direction.
-    v_hop, dirt_hop = v_all_dirt(carrier_3d, potential_3d, hop_ini[0], hop_ini[1], hop_ini[2])
-    rdm2 = random.random()
-    i = 0
-    while i < len(v_hop):
-        if (rdm2 > v_hop[:i].sum()/v_hop.sum()) and\
-        (rdm2 <= v_hop[:i+1].sum()/v_hop.sum()):
-            hop_finl = np.array(dirt_hop[i], dtype = int)
-        break
-        i += 1       
-    carrier_3d[hop_ini[0], hop_ini[1], hop_ini[2]] = 0
-    carrier_3d[hop_finl[0], hop_finl[1], hop_finl[2]] = 1 
-# the boundary of carrier_3d would be set again later.
-    sys_time += rt_min 
-    time_counter += 1
-    if rt_min == 1000: 
-        print("Error!")
-    if time_counter % 10 == 0:
-        print(time_counter)
 
 
 #-------------------------------------------------------------#
@@ -317,7 +279,7 @@ if __name__=='__main__':
     begin = time.time()
     sys_time = 0
     time_counter = 0
-    set_time = 2000  #set the running time, 1000 times hopping
+    set_time = 200  #set the running time, 1000 times hopping
     current_counter = 0
     #parallel computing
     cores = mp.cpu_count()
@@ -385,7 +347,56 @@ if __name__=='__main__':
     #start hopping
     while time_counter < set_time:# set the running time of the simulation
         site_record = []
-        hopping() 
+        #hopping()
+        #----------------------------start Hopping------------------------------------------
+        """
+        #Hopping change carrier_3d and system time.
+        #Potential_3d won't be update in this function.
+        #One charge is hopping.
+        """
+        #To save the time of "pickling", \
+        #c-type shared Arrays are created, which can be shared between processes.
+        ctype_carrier = np.ctypeslib.as_ctypes(carrier_3d)
+        ctype_pot = np.ctypeslib.as_ctypes(potential_3d)
+        shared_carrier = sharedctypes.Array(ctype_carrier._type_, ctype_carrier, lock=False)
+        shared_pot = sharedctypes.Array(ctype_pot._type_, ctype_pot, lock=False)
+        p = Pool(processes=cores-2, initializer=_init, initargs=(shared_carrier, shared_pot))
+        for x in range(len_x):
+            p.apply_async(hopping_x_section, args=(x,), callback=paral_site_record)
+        p.close()
+        p.join()
+        print("signal 1")
+        rt_min = 1000#1000 is meaningless. Just a large enough number to start.
+        for rt_and_site in site_record:
+            if rt_and_site[0] < rt_min:
+                rt_min = rt_and_site[0]
+                hop_ini = rt_and_site[1]
+        #Above process finds the carrier that hops. 
+        #And the probabilities to all 26 directions respectively. 
+        #Yet we still need the hopping direction.
+        v_hop, dirt_hop = v_all_dirt(carrier_3d, potential_3d, 
+                                    hop_ini[0], hop_ini[1], hop_ini[2])
+        rdm2 = random.random()
+        i = 0
+        while i < len(v_hop):
+            if (rdm2 > v_hop[:i].sum()/v_hop.sum()) and\
+            (rdm2 <= v_hop[:i+1].sum()/v_hop.sum()):
+                hop_finl = np.array(dirt_hop[i], dtype = int)
+            break
+            i += 1       
+        carrier_3d[hop_ini[0], hop_ini[1], hop_ini[2]] = 0
+        carrier_3d[hop_finl[0], hop_finl[1], hop_finl[2]] = 1 
+    # the boundary of carrier_3d would be set again later.
+        sys_time += rt_min 
+        time_counter += 1
+        if rt_min == 1000: 
+            print("Error!")
+        if time_counter % 10 == 0:
+            print(time_counter)
+        """
+--------------------------------------------------------------------------------------------------- 
+---------------------------------------------------------------------------------------------------
+        """
         if (hop_finl[1]>0) and (hop_finl[2]<(len_z-1)) and (hop_finl[2]>(t_ox-1)):
             q_num[hop_finl[2], hop_finl[1]] += 1
             potential_2d += single_charge_pot(hop_finl[1], hop_finl[2])
