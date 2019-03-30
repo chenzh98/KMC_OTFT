@@ -4,14 +4,11 @@ Created on Mon Mar 18 15:29:38 2019
 
 @author: Zihao Chen
 """
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import math
-#import moviepy as mvp
 import random 
-#from mayavi import mlab
 from scipy.linalg import solve
 import multiprocessing as mp
 from multiprocessing import Pool
@@ -230,15 +227,14 @@ def single_charge_pot(y, z):
     #for parallel computing
     #Here what we need is the minimum rt, and corresponding site ordinates
     #
-
 def hopping_x_section(x):
-	global carrier_3d
-	global potential_3d
-	global t_ox
-    rt_min = 1000
+    global carrier_3d
+    global potential_3d
+    global t_ox
     #1000 is meaningless. Just a large enough number to start.
     #rt means resident time
-    #v is the probability(vij), dirt is corresponding dirction
+    #v is the probability(vij), dirt is corresponding dirction    
+    rt_min = 1000
     y = 0
     while y < np.shape(carrier_3d)[1]:
         z = t_ox 
@@ -258,7 +254,14 @@ def hopping_x_section(x):
     return rt_min, hop_site
     print("enter child process!!!")
 #In the end, only the minimum resident time and coresponding hopping site are 
-#written in to queue. (x is fixed in this function) !!!
+#recorded in site_record.
+#The following functions is for the callback in the pool.
+def paral_site_record(rt_and_site):
+    global site_record
+    site_record.append(rt_and_site)
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(site_record)
+    print("Above is site_record!!!!!!!!")
 #---------------------------------------------------------------------------#
     #Hopping change carrier_3d and system time.
     #Potential_3d won't be update in this function.
@@ -272,14 +275,23 @@ def hopping():
     global potential_3d
     global rt_queue
     global len_x
+    global site_record
+    global cores
     rt_min = 1000#1000 is meaningless. Just a large enough number to start.
-    pool = mp.Pool(processes=cores)
-    #for x_i in range(len_x):
-    #    pool.apply_async(hopping_x_section, args=(x_i, rt_queue,))
-
+    p = Pool(None)
+    for x in range(len_x):
+        p.apply_async(hopping_x_section, args=(x,), callback=paral_site_record)
+    p.close()
+    p.join()
+    print("signal 1")
+    for rt_and_site in site_record:
+        if rt_and_site[0] < rt_min:
+            rt_min = rt_and_site[0]
+            hop_ini = rt_and_site[1]
     #Above process finds the carrier that hops. 
     #And the probabilities to all 26 directions respectively. 
     #Yet we still need the hopping direction.
+    v_hop, dirt_hop = v_all_dirt(carrier_3d, potential_3d, hop_ini[0], hop_ini[1], hop_ini[2])
     rdm2 = random.random()
     i = 0
     while i < len(v_hop):
@@ -301,24 +313,21 @@ def hopping():
 
 #-------------------------------------------------------------#
 if __name__=='__main__':
-    #define the constants
-    #------------------------------#
+    #---------Initialization-------------#
     begin = time.time()
     sys_time = 0
     time_counter = 0
-    set_time = 200  #set the running time, 1000 times hopping
+    set_time = 2000  #set the running time, 1000 times hopping
     current_counter = 0
     #parallel computing
     cores = mp.cpu_count()
-    pool = mp.Pool(processes=cores)
-    #rt_queue = mp.Queue()#stores rt(resident time) and site ordinates
     #-------------------------------------------------------------------#        
     carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
     potential_3d = np.zeros((len_x, len_y, len_z))
     potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num
     q_num = np.zeros((len_z, len_y))
     # define the source/drain.
-    #1 means a carrier occupied the lattice point. 0 means no carrier
+    #1 means a carrier has occupied the lattice point. 0 means no carrier on the site.
     carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
     #Vd = -10V, Vs = 0, Vg = -10V, other boundary values are 0
     #Use finite difference to solve the potential(y,z)
@@ -371,10 +380,11 @@ if __name__=='__main__':
     #show_mat(potential_2d)
     #visualize(carrier_3d)
     update_pot(potential_2d, potential_3d)
-    pot_record = []
+    #pot_record = []
 #--------------------------------------------------------------------------#
     #start hopping
     while time_counter < set_time:# set the running time of the simulation
+        site_record = []
         hopping() 
         if (hop_finl[1]>0) and (hop_finl[2]<(len_z-1)) and (hop_finl[2]>(t_ox-1)):
             q_num[hop_finl[2], hop_finl[1]] += 1
@@ -393,7 +403,7 @@ if __name__=='__main__':
         carrier_3d[:, 0, t_ox-1:len_z-1] = 0
         current = current_counter*q/sys_time 
         if time_counter == set_time - 1:
-            pot_record.append(potential_2d)
+            #pot_record.append(potential_2d)
             show_mat(potential_2d)
             visualize(carrier_3d)   
     #--------------------------------------------------------------------#
