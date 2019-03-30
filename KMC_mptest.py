@@ -11,7 +11,7 @@ import math
 import random 
 from scipy.linalg import solve
 import multiprocessing as mp
-from multiprocessing import Pool, sharedctypes
+from multiprocessing import Pool, sharedctypes, Manager
 import time
 #-----------------------------------------------------------------------------------
 #define the constants
@@ -227,15 +227,15 @@ def single_charge_pot(y, z):
     #for parallel computing
     #Here what we need is the minimum rt, and corresponding site ordinates
     #
-def hopping_x_section(x):
-    carrier_3d = np.ctypeslib.as_array(c-carrier)
-    potential_3d = np.ctypeslib.as_array(c-potential)
+def hopping_x_section(x, carrier_3d, potential_3d):
+    #carrier_3d = np.array(c-carrier)
+    #potential_3d = np.array(c-potential)
     global t_ox
     #1000 is meaningless. Just a large enough number to start.
     #rt means resident time
     #v is the probability(vij), dirt is corresponding dirction
-    print("enter child process!!!")
-    visualize(carrier_3d)
+    #print("enter child process!!!")
+    #visualize(carrier_3d)
     rt_min = 1000
     y = 0
     while y < np.shape(carrier_3d)[1]:
@@ -253,14 +253,19 @@ def hopping_x_section(x):
                             #hop_ini = np.array([x, y, z], dtype = int)
             z += 1
         y += 1
+    #print("signal2!!!!!!!!!!!!@!!!!!")
+    #print(hop_site)
     return rt_min, hop_site
     #print("enter child process!!!")
 #_init function is for array sharing
+"""
 def _init(carrier, potential):
+    print("initialize!!!!!!")
     global c_carrier
     global c_potential
     c_carrier = carrier
     c_potential = potential
+"""
 #---------------------------------------------------------------------------#
 #In the end, only the minimum resident time and coresponding hopping site are 
 #recorded in site_record.
@@ -268,11 +273,9 @@ def _init(carrier, potential):
 def paral_site_record(rt_and_site):
     global site_record
     site_record.append(rt_and_site)
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print(site_record)
-    print("Above is site_record!!!!!!!!")
-
-
+    print("!!!!!!!!!!!callback!!!!!!!!!!!!!!")
+    #print(site_record)
+    print("Above is site_record!!!!!!!!%d"%len(site_record))
 #-------------------------------------------------------------#
 if __name__=='__main__':
     #---------Initialization-------------#
@@ -356,16 +359,18 @@ if __name__=='__main__':
         """
         #To save the time of "pickling", \
         #c-type shared Arrays are created, which can be shared between processes.
-        ctype_carrier = np.ctypeslib.as_ctypes(carrier_3d)
-        ctype_pot = np.ctypeslib.as_ctypes(potential_3d)
-        shared_carrier = sharedctypes.Array(ctype_carrier._type_, ctype_carrier, lock=False)
-        shared_pot = sharedctypes.Array(ctype_pot._type_, ctype_pot, lock=False)
-        p = Pool(processes=cores-2, initializer=_init, initargs=(shared_carrier, shared_pot))
+        """
+        manager = Manager()
+        shared_carrier = manager.list(carrier_3d.tolist())
+        shared_pot = manager.list(potential_3d.tolist())
+        """
+        p = Pool(None)
         for x in range(len_x):
-            p.apply_async(hopping_x_section, args=(x,), callback=paral_site_record)
+            p.apply_async(hopping_x_section, args=(x, carrier_3d, potential_3d), callback=paral_site_record)
         p.close()
         p.join()
         print("signal 1")
+        print("len of site_record: %d"%len(site_record))
         rt_min = 1000#1000 is meaningless. Just a large enough number to start.
         for rt_and_site in site_record:
             if rt_and_site[0] < rt_min:
@@ -376,13 +381,16 @@ if __name__=='__main__':
         #Yet we still need the hopping direction.
         v_hop, dirt_hop = v_all_dirt(carrier_3d, potential_3d, 
                                     hop_ini[0], hop_ini[1], hop_ini[2])
+        print("v_hop and dirt_hop")
+        print(v_hop)
+        print(dirt_hop)
         rdm2 = random.random()
         i = 0
         while i < len(v_hop):
             if (rdm2 > v_hop[:i].sum()/v_hop.sum()) and\
             (rdm2 <= v_hop[:i+1].sum()/v_hop.sum()):
                 hop_finl = np.array(dirt_hop[i], dtype = int)
-            break
+                break
             i += 1       
         carrier_3d[hop_ini[0], hop_ini[1], hop_ini[2]] = 0
         carrier_3d[hop_finl[0], hop_finl[1], hop_finl[2]] = 1 
