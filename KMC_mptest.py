@@ -176,7 +176,7 @@ def update_pot(potential_2d, potential_3d):
         #历史遗留问题，最开始求解矩阵的时候yz颠倒了，所以这里需要.T进行转置
         i += 1
     #--------------------------------------------------------------------#
-def boundary_pot(potential_2d):
+def set_boundary_pot(potential_2d):
     potential_2d[0] = -10
     potential_2d[t_ox:len_z, 0] = -10
     potential_2d[t_ox:len_z, len_y-1] = 0   
@@ -200,7 +200,9 @@ def single_charge_pot(y, z):
     #for parallel computing
     #Here what we need is the minimum rt, and corresponding site ordinates
     #
-def hopping_x_section(chunk_i, carrier_3d, potential_3d):
+
+
+def hopping_x_section(chunk_i, chunk, carrier_3d, potential_3d):
     #这个函数只处理非边界的情况，所以索引不会包括最外面的一层
     #carrier_3d = np.array(c-carrier)
     #potential_3d = np.array(c-potential)
@@ -211,27 +213,20 @@ def hopping_x_section(chunk_i, carrier_3d, potential_3d):
     #print("enter child process!!!")
     #visualize(carrier_3d)
     rt_min = 1000#1000 is meaningless. Just a large enough name to start
-    x = 0
-    while x < np.shape(carrier_3d)[0]:
-        y = 0
-        while y < np.shape(carrier_3d)[1]:
-            z = t_ox 
-            while z < np.shape(carrier_3d)[2]:
+    for x in range(1, np.shape(carrier_3d)[0]-1)
+        for y in range(1, np.shape(carrier_3d)[1]-1)
+            for z in range(1, np.shape(carrier_3d)[2]-1)
                 if carrier_3d[x, y, z] == 1:
-                    v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)
+                    v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)#dirt在这里暂时没用
                     if v.sum() > 0:
                         rt_i = -math.log(random.random())/v.sum()/v0
                         if rt_i < rt_min:
                             rt_min = rt_i
-                            v_hop = v
-                            dirt_hop = dirt
                             hop_ini = np.array([x, y, z], dtype = int)
-                z += 1
-            y += 1
-        x += 1
     #print("signal2!!!!!!!!!!!!@!!!!!")
     #print(hop_site)
-    return rt_min, hop_site
+    hop_ini += np.array([chunk_i*chunk, 0, t_ox])#返回的必须是真实的坐标
+    return rt_min, hop_ini#这里只是为了返回跳跃的位置和停留时间
     #print("enter child process!!!")
 #_init function is for array sharing
 """
@@ -242,13 +237,132 @@ def _init(carrier, potential):
     c_carrier = carrier
     c_potential = potential
 """
+#-------------------boundary hopping--------------------------------------#
+def top_hopping(carrier_3d, potential_3d):
+    rt_min = 1000
+    z = 1
+    #先不考虑四条边
+    for x in range(1, np.shape(carrier_3d)[0]-1):
+        for y in range(1, np.shape(carrier_3d)[1]-1):
+            if carrier_3d[x, y, z] == 1:
+                v = []#v is the hopping probability
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y, z-1]))             
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y-1, z-1]))              
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y+1, z-1]))               
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y, z-1]))              
+                v.append(vab(carrier_3d, potential_3d, 
+                            [x, y, z], [x, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y-1, z-1]))                
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y+1, z-1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y, z-1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y-1, z-1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y+1, z-1]))
+                if v.sum() > 0:
+                    rt_i = -math.log(random.random())/v.sum()/v0
+                    if rt_i < rt_min:
+                        rt_min = rt_i
+                        hop_ini = np.array([x, y, z], dtype = int)
+    #接下来还要分别算四条边，也先不算四个顶点
+    x = 0
+    for y in range(1, np.shape(carrier_3d)[1]-1):
+        if carrier_3d[x, y, z] == 1:
+            v = []#v is the hopping probability          
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y, z-1]))             
+            v.append(vab(carrier_3d, potential_3d, 
+                        [x, y, z], [x, y-1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y-1, z-1]))               
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y+1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y+1, z-1]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y, z-1]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y-1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y-1, z-1]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y+1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x+1, y+1, z-1]))
+            if v.sum() > 0:
+                rt_i = -math.log(random.random())/v.sum()/v0
+                if rt_i < rt_min:
+                    rt_min = rt_i
+                    hop_ini = np.array([x, y, z], dtype = int)
+    x = np.shape(carrier_3d)[0] - 1
+    for y in range(1, np.shape(carrier_3d)[1]-1):
+        if carrier_3d[x, y, z] == 1:
+            v = []#v is the hopping probability          
+            v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x-1, y, z-1]))             
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x-1, y-1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x-1, y-1, z-1]))              
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x-1, y+1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x-1, y+1, z-1]))               
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y, z-1]))              
+            v.append(vab(carrier_3d, potential_3d, 
+                        [x, y, z], [x, y-1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y-1, z-1]))                
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y+1, z]))
+            v.append(vab(carrier_3d, potential_3d, 
+                         [x, y, z], [x, y+1, z-1]))
+            if v.sum() > 0:
+                rt_i = -math.log(random.random())/v.sum()/v0
+                if rt_i < rt_min:
+                    rt_min = rt_i
+                    hop_ini = np.array([x, y, z], dtype = int)
+
+def bottom_hopping()
+def left_hopping()
+def right_hopping()
+def front_hopping()
+def back_hopping()
 #---------------------------------------------------------------------------#
 #In the end, only the minimum resident time and coresponding hopping site are 
 #recorded in site_record.
 #The following functions is for the callback in the pool.
 def paral_site_record(rt_and_site):
     global site_record
-    site_record.append(rt_and_site)
+    global rt_record
+    site_record.append(rt_and_site[1])#返回的必须是真实的坐标
+    rt_record.append(rt_and_site[0])
     print("!!!!!!!!!!!callback!!!!!!!!!!!!!!")
     #print(site_record)
     print("Above is site_record!!!!!!!!%d"%len(site_record))
@@ -317,7 +431,7 @@ if __name__=='__main__':
     while i < (len_z-1):
         potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
         i += 1
-    boundary_pot(potential_2d)
+    set_boundary_pot(potential_2d)
     #show_mat(potential_2d)
     #visualize(carrier_3d)
     update_pot(potential_2d, potential_3d)
@@ -328,6 +442,7 @@ if __name__=='__main__':
     #start hopping
     while time_counter < set_time:# set the running time of the simulation
         site_record = []
+        rt_record = []
         #hopping()
         #----------------------------start Hopping------------------------------------------
         """
@@ -335,25 +450,37 @@ if __name__=='__main__':
         #Potential_3d won't be update in this function.
         #One charge is hopping.
         """
-        #To save the time of "pickling", \
-        #c-type shared Arrays are created, which can be shared between processes.
-        """
-        manager = Manager()
-        shared_carrier = manager.list(carrier_3d.tolist())
-        shared_pot = manager.list(potential_3d.tolist())
-        """
         #首先对carrier_3d进行分割，放进子进程
         chunk = np.shape(carrier_3d)[0] // cores
         p = Pool(processes=cores)
         for i in range(cores):
             slice_of_carrier_3d = slice(i*chunk, 
                                         np.shape(carrier_3d)[0] if i == cores-1 else (i+1)*chunk+2)
-            p.apply_async(hopping_x_section, args=(i, carrier_3d[slice_of_carrier_3d, :, 5:], 
-                                                      potential_3d[slice_of_carrier_3d, :, 5:]), 
+            p.apply_async(hopping_x_section, args=(i, chunk, carrier_3d[slice_of_carrier_3d, :, t_ox:], 
+                                                             potential_3d[slice_of_carrier_3d, :, t_ox:]), 
                                             callback=paral_site_record)
         p.close()
         p.join()
         print("signal 1")
+        print("len of site_record: %d"%len(site_record))
+        #-------------------boundary computation-----------------------------#
+        #6个表面边界的停留时间计算
+        top_c = carrier_3d[:, :, len_z-2:]
+        bottom_c = carrier_3d[:, :, t_ox:t_ox+2]
+        left_c = carrier_3d[:, :2, :]
+        right_c = carrier_3d[:, len_y-2:, :]
+        front_c = carrier_3d[len_x-2:, :, :]
+        back_c = carrier_3d[0:2, :, :]
+        boundary_carrier = [top_c, bottom_c, left_c, right_c, front_c, back_c]
+        top_p = potential_3d[:, :, len_z-2:]
+        bottom_p = potential_3d[:, :, t_ox:t_ox+2]
+        left_p = potential_3d[:, :2, :]
+        right_p = potential_3d[:, len_y-2:, :]
+        front_p = potential_3d[len_x-2:, :, :]
+        back_p = potential_3d[0:2, :, :]
+        boundary_potential = [top_p, bottom_p, left_p, right_p, front_p, back_p]
+
+
         print("len of site_record: %d"%len(site_record))
         rt_min = 1000#1000 is meaningless. Just a large enough number to start.
         for rt_and_site in site_record:
@@ -395,7 +522,7 @@ if __name__=='__main__':
         if (hop_ini[1]<(len_y-1)) and (hop_ini[2]<(len_z-1)):
             q_num[hop_ini[2], hop_ini[1]] -= 1
             potential_2d -= single_charge_pot(hop_ini[1], hop_ini[2])
-        boundary_pot(potential_2d)
+        set_boundary_pot(potential_2d)
         update_pot(potential_2d, potential_3d)
         #Now consider source and drain current
         #Once a charge carrier leaves source, the empty site would be refilled.
