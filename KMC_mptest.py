@@ -67,12 +67,13 @@ def savenpy(arr, name):
     #calc the probability of hopping from site a to b
     #这里采用MA公式
 def vab(carrier_3d, potential_3d, a, b):
+#    global t_ox
     Ea = potential_3d[a[0], a[1], a[2]]
     Eb = potential_3d[b[0], b[1], b[2]]
     if carrier_3d[b[0], b[1], b[2]] > 0:
         return 0
-    elif b[2] < t_ox - 1:
-        return 0
+#    elif b[2] < t_ox:
+#        return 0
     elif Eb > Ea:
         return math.exp(-10*math.sqrt((b[0]-a[0])**2+
                                           (b[1]-a[1])**2+(b[2]-a[2])**2)-
@@ -83,114 +84,86 @@ def vab(carrier_3d, potential_3d, a, b):
     #--------------------------------------------------------------------------#
     #Given a point, get the vij to all 26 directions at the point
 def v_all_dirt(carrier_3d, potential_3d, x, y, z):
-    v = []
-    dirtn = []
-    if x-1 >= 0:
-        v.append(vab(carrier_3d, potential_3d, 
-                     [x, y, z], [x-1, y, z]))
-        dirtn.append([x-1, y, z])
-        if z-1 > t_ox - 1:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x-1, y, z-1]))
-            dirtn.append([x-1, y, z-1])
-        if z+1 < len_z:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x-1, y, z+1]))
-            dirtn.append([x-1, y, z+1])
-        if y-1 >= 0:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x-1, y-1, z]))
-            dirtn.append([x-1, y-1, z])
-            if z-1 > t_ox - 1:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x-1, y-1, z-1]))
-                dirtn.append([x-1, y-1, z-1])
-            if z+1 < len_z:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x-1, y-1, z+1]))
-                dirtn.append([x-1, y-1, z+1])
-        if y+1 < len_y:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x-1, y+1, z]))
-            dirtn.append([x-1, y+1, z])
-            if z-1 > t_ox - 1:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x-1, y+1, z-1]))
-                dirtn.append([x-1, y+1, z-1])
-            if z+1 < len_z:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x-1, y+1, z+1]))
-                dirtn.append([x-1, y+1, z+1])
-  #########################################################
-    if z-1 > t_ox - 1:
-        v.append(vab(carrier_3d, potential_3d, 
-                     [x, y, z], [x, y, z-1]))
-        dirtn.append([x, y, z-1])
-    if z+1 < len_z:
-        v.append(vab(carrier_3d, potential_3d, 
-                     [x, y, z], [x, y, z+1]))
-        dirtn.append([x, y, z+1])
-    if y-1 >= 0:
-        v.append(vab(carrier_3d, potential_3d, 
-                    [x, y, z], [x, y-1, z]))
-        dirtn.append([x, y-1, z])
-        if z-1 > t_ox - 1:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x, y-1, z-1]))
-            dirtn.append([x, y-1, z-1])
-        if z+1 < len_z:
-            v.append(vab(carrier_3d, potential_3d, 
-                        [x, y, z], [x, y-1, z+1]))
-            dirtn.append([x, y-1, z+1])
-    if y+1 < len_y:
-        v.append(vab(carrier_3d, potential_3d, 
-                     [x, y, z], [x, y+1, z]))
-        dirtn.append([x, y+1, z])
-        if z-1 > t_ox - 1:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x, y+1, z-1]))
-            dirtn.append([x, y+1, z-1])
-        if z+1 < len_z:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x, y+1, z+1]))
-            dirtn.append([x, y+1, z+1])
-  ##################################################
-    if x+1 < len_x:
-        v.append(vab(carrier_3d, potential_3d, 
-                     [x, y, z], [x+1, y, z]))
-        dirtn.append([x+1, y, z])
-        if z-1 > t_ox - 1:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x+1, y, z-1]))
-            dirtn.append([x+1, y, z-1])
-        if z+1 < len_z:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x+1, y, z+1]))
-            dirtn.append([x+1, y, z+1])
-        if y-1 >= 0:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x+1, y-1, z]))
-            dirtn.append([x+1, y-1, z])
-            if z-1 > t_ox - 1:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x+1, y-1, z-1]))
-                dirtn.append([x+1, y-1, z-1])
-            if z+1 < len_z:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x+1, y-1, z+1]))
-                dirtn.append([x+1, y-1, z+1])
-        if y+1 < len_y:
-            v.append(vab(carrier_3d, potential_3d, 
-                         [x, y, z], [x+1, y+1, z]))
-            dirtn.append([x+1, y+1, z])
-            if z-1 > t_ox - 1:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x+1, y+1, z-1]))
-                dirtn.append([x+1, y+1, z-1])
-            if z+1 < len_z:
-                v.append(vab(carrier_3d, potential_3d, 
-                             [x, y, z], [x+1, y+1, z+1]))
-                dirtn.append([x+1, y+1, z+1])
+    v = []#v is the hopping probability
+    dirtn = []#direction
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y, z]))
+    dirtn.append([x-1, y, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y, z-1]))
+    dirtn.append([x-1, y, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y, z+1]))
+    dirtn.append([x-1, y, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y-1, z]))
+    dirtn.append([x-1, y-1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y-1, z-1]))
+    dirtn.append([x-1, y-1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y-1, z+1]))
+    dirtn.append([x-1, y-1, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y+1, z]))
+    dirtn.append([x-1, y+1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y+1, z-1]))
+    dirtn.append([x-1, y+1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x-1, y+1, z+1]))
+    dirtn.append([x-1, y+1, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y, z-1]))
+    dirtn.append([x, y, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y, z+1]))
+    dirtn.append([x, y, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                [x, y, z], [x, y-1, z]))
+    dirtn.append([x, y-1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y-1, z-1]))
+    dirtn.append([x, y-1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                [x, y, z], [x, y-1, z+1]))
+    dirtn.append([x, y-1, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y+1, z]))
+    dirtn.append([x, y+1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y+1, z-1]))
+    dirtn.append([x, y+1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x, y+1, z+1]))
+    dirtn.append([x, y+1, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y, z]))
+    dirtn.append([x+1, y, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y, z-1]))
+    dirtn.append([x+1, y, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y, z+1]))
+    dirtn.append([x+1, y, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y-1, z]))
+    dirtn.append([x+1, y-1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y-1, z-1]))
+    dirtn.append([x+1, y-1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y-1, z+1]))
+    dirtn.append([x+1, y-1, z+1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y+1, z]))
+    dirtn.append([x+1, y+1, z])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y+1, z-1]))
+    dirtn.append([x+1, y+1, z-1])
+    v.append(vab(carrier_3d, potential_3d, 
+                 [x, y, z], [x+1, y+1, z+1]))
+    dirtn.append([x+1, y+1, z+1])
     return np.array(v), np.array(dirtn)
     #v is a list of probability(v_ij) hopping to nearest sites.
     #dirt is the corresponding dirction(site).
@@ -227,7 +200,8 @@ def single_charge_pot(y, z):
     #for parallel computing
     #Here what we need is the minimum rt, and corresponding site ordinates
     #
-def hopping_x_section(x, carrier_3d, potential_3d):
+def hopping_x_section(chunk_i, carrier_3d, potential_3d):
+    #这个函数只处理非边界的情况，所以索引不会包括最外面的一层
     #carrier_3d = np.array(c-carrier)
     #potential_3d = np.array(c-potential)
     global t_ox
@@ -236,23 +210,25 @@ def hopping_x_section(x, carrier_3d, potential_3d):
     #v is the probability(vij), dirt is corresponding dirction
     #print("enter child process!!!")
     #visualize(carrier_3d)
-    rt_min = 1000
-    y = 0
-    while y < np.shape(carrier_3d)[1]:
-        z = t_ox 
-        while z < np.shape(carrier_3d)[2]:
-            if carrier_3d[x, y, z] == 1:
-                v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)
-                if v.sum() > 0:
-                    rt_i = -math.log(random.random())/v.sum()
-                    if rt_i < rt_min:
-                        rt_min = rt_i
-                        hop_site = [x, y, z]
-                            #v_hop = v
-                            #dirt_hop = dirt
-                            #hop_ini = np.array([x, y, z], dtype = int)
-            z += 1
-        y += 1
+    rt_min = 1000#1000 is meaningless. Just a large enough name to start
+    x = 0
+    while x < np.shape(carrier_3d)[0]:
+        y = 0
+        while y < np.shape(carrier_3d)[1]:
+            z = t_ox 
+            while z < np.shape(carrier_3d)[2]:
+                if carrier_3d[x, y, z] == 1:
+                    v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)
+                    if v.sum() > 0:
+                        rt_i = -math.log(random.random())/v.sum()/v0
+                        if rt_i < rt_min:
+                            rt_min = rt_i
+                            v_hop = v
+                            dirt_hop = dirt
+                            hop_ini = np.array([x, y, z], dtype = int)
+                z += 1
+            y += 1
+        x += 1
     #print("signal2!!!!!!!!!!!!@!!!!!")
     #print(hop_site)
     return rt_min, hop_site
@@ -285,7 +261,7 @@ if __name__=='__main__':
     set_time = 200  #set the running time, 1000 times hopping
     current_counter = 0
     #parallel computing
-    cores = mp.cpu_count()
+    cores = 4#mp.cpu_count()
     #-------------------------------------------------------------------#        
     carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
     potential_3d = np.zeros((len_x, len_y, len_z))
@@ -345,6 +321,8 @@ if __name__=='__main__':
     #show_mat(potential_2d)
     #visualize(carrier_3d)
     update_pot(potential_2d, potential_3d)
+    np.save('potential_3d' + '_' + str(len_x) + '_' 
+            + str(len_y) + '_' + str(len_z) + '.npy', potential_3d)
     #pot_record = []
 #--------------------------------------------------------------------------#
     #start hopping
@@ -364,9 +342,15 @@ if __name__=='__main__':
         shared_carrier = manager.list(carrier_3d.tolist())
         shared_pot = manager.list(potential_3d.tolist())
         """
-        p = Pool(None)
-        for x in range(len_x):
-            p.apply_async(hopping_x_section, args=(x, carrier_3d, potential_3d), callback=paral_site_record)
+        #首先对carrier_3d进行分割，放进子进程
+        chunk = np.shape(carrier_3d)[0] // cores
+        p = Pool(processes=cores)
+        for i in range(cores):
+            slice_of_carrier_3d = slice(i*chunk, 
+                                        np.shape(carrier_3d)[0] if i == cores-1 else (i+1)*chunk+2)
+            p.apply_async(hopping_x_section, args=(i, carrier_3d[slice_of_carrier_3d, :, 5:], 
+                                                      potential_3d[slice_of_carrier_3d, :, 5:]), 
+                                            callback=paral_site_record)
         p.close()
         p.join()
         print("signal 1")
