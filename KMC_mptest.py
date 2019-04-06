@@ -22,6 +22,7 @@ q = 1.6e-19  #elemental charge
 lat_c = 1e-9   #lattice constant
 kB = 1.38e-23
 T = 300
+v0 = 1
 
 # The scale of the simulation 200nm*30nm*200nm
 t_ox = 5
@@ -68,103 +69,128 @@ def savenpy(arr, name):
     #这里采用MA公式
 def vab(carrier_3d, potential_3d, a, b):
 #    global t_ox
-    Ea = potential_3d[a[0], a[1], a[2]]
-    Eb = potential_3d[b[0], b[1], b[2]]
-    if carrier_3d[b[0], b[1], b[2]] > 0:
+    #为了处理边界问题，这里捕获了索引异常，但是-1任然会被索引，所以还是有三个面边界需要特殊处理
+    try:
+        Ea = potential_3d[a[0], a[1], a[2]]
+        Eb = potential_3d[b[0], b[1], b[2]]
+        if carrier_3d[b[0], b[1], b[2]] > 0:
+            return 0
+    #    elif b[2] < t_ox:
+    #        return 0
+        elif Eb > Ea:
+            return math.exp(-10*math.sqrt((b[0]-a[0])**2+
+                                              (b[1]-a[1])**2+(b[2]-a[2])**2)-
+                                              q*(Eb-Ea)/(kB*T))
+        else:
+            return math.exp(-10*math.sqrt((b[0]-a[0])**2+
+                                              (b[1]-a[1])**2+(b[2]-a[2])**2))
+    except IndexError:
         return 0
-#    elif b[2] < t_ox:
-#        return 0
-    elif Eb > Ea:
-        return math.exp(-10*math.sqrt((b[0]-a[0])**2+
-                                          (b[1]-a[1])**2+(b[2]-a[2])**2)-
-                                          q*(Eb-Ea)/(kB*T))
-    else:
-        return math.exp(-10*math.sqrt((b[0]-a[0])**2+
-                                          (b[1]-a[1])**2+(b[2]-a[2])**2))
     #--------------------------------------------------------------------------#
     #Given a point, get the vij to all 26 directions at the point
-def v_all_dirt(carrier_3d, potential_3d, x, y, z):
+def v_all_drt(carrier_3d, potential_3d, x, y, z, boundary='No', get_drt=False):
     v = []#v is the hopping probability
-    dirtn = []#direction
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y, z]))
-    dirtn.append([x-1, y, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y, z-1]))
-    dirtn.append([x-1, y, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y, z+1]))
-    dirtn.append([x-1, y, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y-1, z]))
-    dirtn.append([x-1, y-1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y-1, z-1]))
-    dirtn.append([x-1, y-1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y-1, z+1]))
-    dirtn.append([x-1, y-1, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y+1, z]))
-    dirtn.append([x-1, y+1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y+1, z-1]))
-    dirtn.append([x-1, y+1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x-1, y+1, z+1]))
-    dirtn.append([x-1, y+1, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y, z-1]))
-    dirtn.append([x, y, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y, z+1]))
-    dirtn.append([x, y, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                [x, y, z], [x, y-1, z]))
-    dirtn.append([x, y-1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y-1, z-1]))
-    dirtn.append([x, y-1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                [x, y, z], [x, y-1, z+1]))
-    dirtn.append([x, y-1, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y+1, z]))
-    dirtn.append([x, y+1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y+1, z-1]))
-    dirtn.append([x, y+1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x, y+1, z+1]))
-    dirtn.append([x, y+1, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y, z]))
-    dirtn.append([x+1, y, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y, z-1]))
-    dirtn.append([x+1, y, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y, z+1]))
-    dirtn.append([x+1, y, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y-1, z]))
-    dirtn.append([x+1, y-1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y-1, z-1]))
-    dirtn.append([x+1, y-1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y-1, z+1]))
-    dirtn.append([x+1, y-1, z+1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y+1, z]))
-    dirtn.append([x+1, y+1, z])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y+1, z-1]))
-    dirtn.append([x+1, y+1, z-1])
-    v.append(vab(carrier_3d, potential_3d, 
-                 [x, y, z], [x+1, y+1, z+1]))
-    dirtn.append([x+1, y+1, z+1])
-    return np.array(v), np.array(dirtn)
+    drtn = []#direction
+    if boundary == 'No':
+        if get_drt == False:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])
+    elif boundary == 'top':
+        if get_drt == False:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])
+    elif boundary == 'bottom':
+        if get_drt == False:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])  
+    elif boundary == 'left':
+        if get_drt == False:
+            for i in [0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [0, 1]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])
+    elif boundary == 'right':
+        if get_drt == False:
+            for i in [-1, 0]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0]:
+                for j in [-1, 0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])
+    elif boundary == 'front':
+        if get_drt == False:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0, 1]:
+                for j in [-1, 0]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k])                 
+    elif boundary == 'back':
+        if get_drt == False:
+            for i in [-1, 0, 1]:
+                for j in [0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+        else:
+            for i in [-1, 0, 1]:
+                for j in [0, 1]:
+                    for k in [-1, 0, 1]:
+                        v.append(vab(carrier_3d, potential_3d, 
+                                     [x, y, z], [x+i, y+j, z+k]))
+                        drtn.append([x+i, y+j, z+k]) 
+    
+    return np.array(v), np.array(drtn)
     #v is a list of probability(v_ij) hopping to nearest sites.
     #dirt is the corresponding dirction(site).
     #---------------------------------------------------------------------#
@@ -214,8 +240,8 @@ def hopping_x_section(chunk_i, chunk, carrier_3d, potential_3d):
     #visualize(carrier_3d)
     rt_min = 1000#1000 is meaningless. Just a large enough name to start
     for x in range(1, np.shape(carrier_3d)[0]-1)
-        for y in range(1, np.shape(carrier_3d)[1]-1)
-            for z in range(1, np.shape(carrier_3d)[2]-1)
+        for y in range(1, np.shape(carrier_3d)[1])
+            for z in range(1, np.shape(carrier_3d)[2])
                 if carrier_3d[x, y, z] == 1:
                     v, dirt = v_all_dirt(carrier_3d, potential_3d, x, y, z)#dirt在这里暂时没用
                     if v.sum() > 0:
@@ -349,7 +375,52 @@ def top_hopping(carrier_3d, potential_3d):
                     rt_min = rt_i
                     hop_ini = np.array([x, y, z], dtype = int)
 
-def bottom_hopping()
+def bottom_hopping(carrier_3d, potential_3d):
+    rt_min = 1000
+    z = 0
+    for x in range(1, np.shape(carrier_3d)[0]):
+        for y in range(1, np.shape(carrier_3d)[1]):
+            if carrier_3d[x, y, z] == 1:
+                v = []#v is the hopping probability
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y, z+1]))             
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y-1, z+1]))              
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x-1, y+1, z+1]))               
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y, z+1]))              
+                v.append(vab(carrier_3d, potential_3d, 
+                            [x, y, z], [x, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y-1, z+1]))                
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x, y+1, z+1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y, z+1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y-1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y-1, z+1]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y+1, z]))
+                v.append(vab(carrier_3d, potential_3d, 
+                             [x, y, z], [x+1, y+1, z+1]))
+                if v.sum() > 0:
+                    rt_i = -math.log(random.random())/v.sum()/v0
+                    if rt_i < rt_min:
+                        rt_min = rt_i
+                        hop_ini = np.array([x, y, z], dtype = int)
 def left_hopping()
 def right_hopping()
 def front_hopping()
@@ -444,7 +515,7 @@ if __name__=='__main__':
         site_record = []
         rt_record = []
         #hopping()
-        #----------------------------start Hopping------------------------------------------
+        #----------------------------start Hopping--------------------------
         """
         #Hopping change carrier_3d and system time.
         #Potential_3d won't be update in this function.
@@ -464,21 +535,21 @@ if __name__=='__main__':
         print("signal 1")
         print("len of site_record: %d"%len(site_record))
         #-------------------boundary computation-----------------------------#
-        #6个表面边界的停留时间计算
-        top_c = carrier_3d[:, :, len_z-2:]
+        #4个表面边界的停留时间计算
+        #top_c = carrier_3d[:, :, len_z-2:]
         bottom_c = carrier_3d[:, :, t_ox:t_ox+2]
         left_c = carrier_3d[:, :2, :]
         right_c = carrier_3d[:, len_y-2:, :]
-        front_c = carrier_3d[len_x-2:, :, :]
+        #front_c = carrier_3d[len_x-2:, :, :]
         back_c = carrier_3d[0:2, :, :]
-        boundary_carrier = [top_c, bottom_c, left_c, right_c, front_c, back_c]
-        top_p = potential_3d[:, :, len_z-2:]
+        boundary_carrier = [bottom_c, left_c, right_c, back_c]
+        #top_p = potential_3d[:, :, len_z-2:]
         bottom_p = potential_3d[:, :, t_ox:t_ox+2]
         left_p = potential_3d[:, :2, :]
         right_p = potential_3d[:, len_y-2:, :]
-        front_p = potential_3d[len_x-2:, :, :]
+        #front_p = potential_3d[len_x-2:, :, :]
         back_p = potential_3d[0:2, :, :]
-        boundary_potential = [top_p, bottom_p, left_p, right_p, front_p, back_p]
+        boundary_potential = [bottom_p, left_p, right_p, back_p]
 
 
         print("len of site_record: %d"%len(site_record))
