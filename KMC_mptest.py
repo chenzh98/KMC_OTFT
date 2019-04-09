@@ -157,7 +157,7 @@ def v_all_drt(carrier_3d, potential_3d, x, y, z, boundary='No', get_drt=False):
     #---------------------------------------------------------------------#
 def hopping_x_section(chunk_i, chunk, carrier_3d, potential_3d):
     #这个函数只处理非边界的情况，所以索引不会包括最外面的一层
-    print("enter child process!!!")
+    #print("enter child process!!!")
     #visualize(carrier_3d)
     rt_min = 1000#1000 is meaningless. Just a large enough name to start
     for x in range(1, np.shape(carrier_3d)[0]-1):
@@ -180,7 +180,7 @@ def hopping_x_section(chunk_i, chunk, carrier_3d, potential_3d):
 def bottom_hopping(carrier_3d, potential_3d):
     rt_min = 1000
     z = 0
-    print('Enter bottom_hopping!!!!')
+    #print('Enter bottom_hopping!!!!')
     for x in range(1, np.shape(carrier_3d)[0]):
         for y in range(1, np.shape(carrier_3d)[1]):
             if carrier_3d[x, y, z] == 1:
@@ -244,26 +244,9 @@ def paral_site_record(rt_and_site):
     global rt_record
     site_record.append(rt_and_site[1])#返回的必须是真实的坐标
     rt_record.append(rt_and_site[0])
-#   print("!!!!!!!!!!!callback!!!!!!!!!!!!!!")
-    #print(site_record)
-    print("Above is site_record!!!!!!!!%d"%len(site_record))
-#-------------------------------------------------------------#
-if __name__=='__main__':
-    #---------Initialization-------------#
-    begin = time.time()
-    sys_time = 0
-    time_counter = 0
-    set_time = 50  #set the running time, 1000 times hopping
-    current_counter = 0
-    cores = 4#mp.cpu_count()
-    #-------------------------------------------------------------------#        
-    carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
+def solve_potential(len_x, len_y, len_z):
     potential_3d = np.zeros((len_x, len_y, len_z))
     potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num
-    q_num = np.zeros((len_z, len_y))
-    # define the source/drain.
-    #1 means a carrier has occupied the lattice point. 0 means no carrier on the site.
-    carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
     #Vd = -10V, Vs = 0, Vg = -10V, other boundary values are 0
     #Use finite difference to solve the potential(y,z)
     #Since the boundary potential is given, we need to calc a (30-2)x(200-2) matrix
@@ -312,17 +295,33 @@ if __name__=='__main__':
         potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
         i += 1
     set_boundary_pot(potential_2d)
-    #show_mat(potential_2d)
-    #visualize(carrier_3d)
+    show_mat(potential_2d)
     update_pot(potential_2d, potential_3d)
     np.save('potential_3d' + '_' + str(len_x) + '_' 
             + str(len_y) + '_' + str(len_z) + '.npy', potential_3d)
-    #pot_record = []
+    return potential_2d, potential_3d
+
+#-------------------------------------------------------------#
+if __name__=='__main__':
+    #---------Initialization-------------#
+    begin = time.time()
+    sys_time = 0
+    time_counter = 0
+    set_time = 10  #set the running time, 1000 times hopping
+    current_counter = 0
+    cores = 4#mp.cpu_count()
+    #-------------------------------------------------------------------#        
+    carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
+    carrier_3d[:, len_y-1, t_ox:len_z-1] = 1
+    q_num = np.zeros((len_z, len_y))
+    potential_2d, potential_3d = solve_potential(len_x, len_y, len_z)
+    visualize(carrier_3d)
 #--------------------------------------------------------------------------#
     #start hopping
     while time_counter < set_time:# set the running time of the simulation
         site_record = []
         rt_record = []
+        hop_begin = time.time()
         #hopping()
         #----------------------------start Hopping--------------------------
         """
@@ -341,9 +340,10 @@ if __name__=='__main__':
                                             callback=paral_site_record)
         p.close()
         p.join()
-        print("signal 1")
-        print("len of site_record: %d"%len(site_record))
-        print("len of rt_record: %d"%len(rt_record))
+        signal_1 = time.time()
+        print("signal 1 %.4f"%(signal_1 - hop_begin))
+        #print("len of site_record: %d"%len(site_record))
+        #print("len of rt_record: %d"%len(rt_record))
         #-------------------boundary computation-----------------------------#
         #4个表面边界的停留时间计算
         #top_c = carrier_3d[:, :, len_z-2:]
@@ -363,13 +363,15 @@ if __name__=='__main__':
         y_axis_p = potential_3d[:2, :, t_ox: t_ox+2]
         boundary_potential = [bottom_p, front_p, back_p, y_axis_p]
         boundary_func = [bottom_hopping, front_hopping, back_hopping, y_axis_hopping]
+        p2 = Pool(processes=cores)
         for i in range(len(boundary_carrier)):
-            p.apply_async(boundary_func[i], args=(boundary_carrier[i], boundary_potential[i]), 
+            p2.apply_async(boundary_func[i], args=(boundary_carrier[i], boundary_potential[i]), 
                                             callback=paral_site_record)
-        p.close()
-        p.join()
-
-        print("len of site_record: %d"%len(site_record))
+        p2.close()
+        p2.join()
+        signal_2 = time.time()
+        print("signal 2 %.4f"%(signal_2 - signal_1))
+        #print("len of site_record: %d"%len(site_record))
         rt_min = min(rt_record)
         hop_ini = site_record[rt_record.index(rt_min)]
         #Above process finds the carrier that hops. 
@@ -391,9 +393,9 @@ if __name__=='__main__':
         else:
             v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
                                     hop_ini[0], hop_ini[1], hop_ini[2], get_drt=True)
-        print("v_hop and drt_hop")
-        print(v_hop)
-        print(drt_hop)
+        #print("v_hop and drt_hop")
+        #print(v_hop)
+        #print(drt_hop)
         rdm2 = random.random()
         i = 0
         while i < len(v_hop):
