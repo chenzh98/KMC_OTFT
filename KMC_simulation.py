@@ -7,11 +7,11 @@ import math
 import random 
 #from mayavi import mlab
 from scipy.linalg import solve
-import datetime
-begin = datetime.datetime.now()
+import time
+begin = time.time()
 sys_time = 0
 time_counter = 0
-set_time = 200  #set the running time, 1000 times hopping
+set_time = 200000  #set the running time, 1000 times hopping
 current_counter = 0
 #-------------------------------------------------------------#
 #define the constants
@@ -325,9 +325,9 @@ while i < (len_z-1):
     potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
     i += 1
 potential_2d = boundary_pot(potential_2d)
-#show_mat(potential_2d)
+show_mat(potential_2d)
 #---------------------------------------------------------------------------------------------
-#visualize(carrier_3d)
+visualize(carrier_3d)
 potential_3d = update_pot(potential_2d, potential_3d)
 pot_record = []
 #start hopping
@@ -354,11 +354,11 @@ while time_counter <= set_time:# set the running time of the simulation
     or time_counter == set_time//2 \
     or time_counter == set_time - 1:
         pot_record.append(potential_2d)
-        #show_mat(potential_2d)
+        show_mat(potential_2d)
         #plt.savefig('potential'+ str(time_counter) + '.png')
-        #visualize(carrier_3d)
+        visualize(carrier_3d)
 #--------------------------------------------------------------------#
-end = datetime.datetime.now()
+end = time.time()
 print("Runtime: %0.4f", end - begin)      
             
         
