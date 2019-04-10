@@ -3,6 +3,7 @@
 Created on Mon Mar 18 15:29:38 2019
 
 @author: Zihao Chen
+version 2 for multiprocessing
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,14 +24,14 @@ lat_c = 1e-9   #lattice constant
 kB = 1.38e-23
 T = 300
 v0 = 1
-
 # The scale of the simulation 200nm*30nm*200nm
 t_ox = 5
 t_semi = 10
 len_x = 50 
 len_y = 50
 len_z = t_ox + t_semi
-
+#------------------cores for multiprocessing---------------------------------#
+cores = 12#mp.cpu_count()
 #----------------------------define functions---------------------------------#
 def visualize(c_3d):
     x = []
@@ -106,8 +107,10 @@ def vab(carrier_3d, potential_3d, a, b):
         Eb = potential_3d[b[0], b[1], b[2]]
         if carrier_3d[b[0], b[1], b[2]] > 0:
             return 0
-    #    elif b[2] < t_ox:
-    #        return 0
+        elif b[2] < t_ox:
+            return 0
+        elif b[0] < 0 or b[1] < 0:
+            return 0
         elif Eb > Ea:
             return math.exp(-10*math.sqrt((b[0]-a[0])**2+
                                               (b[1]-a[1])**2+(b[2]-a[2])**2)-
@@ -119,21 +122,10 @@ def vab(carrier_3d, potential_3d, a, b):
         return 0
     #--------------------------------------------------------------------------#
     #Given a point, get the vij to all 26 directions at the point
-def v_all_drt(carrier_3d, potential_3d, x, y, z, boundary='No', get_drt=False):
+def v_all_drt(carrier_3d, potential_3d, x, y, z, get_drt=False):
     x_neighbor = [-1, 0, 1]
     y_neighbor = [-1, 0, 1]
     z_neighbor = [-1, 0, 1]  
-    if boundary == 'No':
-        pass
-    elif boundary == 'bottom':
-        z_neighbor = [0, 1]
-    elif boundary == 'front':
-        x_neighbor = [-1, 0]
-    elif boundary == 'back':
-        x_neighbor = [0, 1]
-    elif boundary == 'y_axis':
-        x_neighbor = [0, 1]
-        z_neighbor = [0, 1]
     v = []#v is the hopping probability
     drtn = []#direction
     if get_drt == False:
@@ -160,23 +152,48 @@ def hopping_x_section(chunk_i, chunk, carrier_3d, potential_3d):
     #print("enter child process!!!")
     #visualize(carrier_3d)
     rt_min = 1000#1000 is meaningless. Just a large enough name to start
-    for x in range(1, np.shape(carrier_3d)[0]-1):
-        for y in range(1, np.shape(carrier_3d)[1]):
-            for z in range(1, np.shape(carrier_3d)[2]):
-                if carrier_3d[x, y, z] == 1:
-                    v, drt = v_all_drt(carrier_3d, potential_3d, x, y, z)#drt在这里暂时没用
-                    if v.sum() > 0:
-                        #print("I did find something useful!")
-                        rt_i = -math.log(random.random())/v.sum()/v0
-                        if rt_i < rt_min:
-                            rt_min = rt_i
-                            hop_ini = np.array([x, y, z], dtype = int)
+    if chunk_i == cores - 1:
+        for x in range(1, np.shape(carrier_3d)[0]):
+            for y in range(0, np.shape(carrier_3d)[1]):
+                for z in range(5, np.shape(carrier_3d)[2]):
+                    if carrier_3d[x, y, z] == 1:
+                        v, drt = v_all_drt(carrier_3d, potential_3d, x, y, z)#drt在这里暂时没用
+                        if v.sum() > 0:
+                            #print("I did find something useful!")
+                            rt_i = -math.log(random.random())/v.sum()/v0
+                            if rt_i < rt_min:
+                                rt_min = rt_i
+                                hop_ini = np.array([x, y, z], dtype = int)
+    elif chunk_i == 0:
+        for x in range(0, np.shape(carrier_3d)[0]-1):
+            for y in range(0, np.shape(carrier_3d)[1]):
+                for z in range(5, np.shape(carrier_3d)[2]):
+                    if carrier_3d[x, y, z] == 1:
+                        v, drt = v_all_drt(carrier_3d, potential_3d, x, y, z)#drt在这里暂时没用
+                        if v.sum() > 0:
+                            #print("I did find something useful!")
+                            rt_i = -math.log(random.random())/v.sum()/v0
+                            if rt_i < rt_min:
+                                rt_min = rt_i
+                                hop_ini = np.array([x, y, z], dtype = int)
+    else:
+        for x in range(1, np.shape(carrier_3d)[0]-1):
+            for y in range(0, np.shape(carrier_3d)[1]):
+                for z in range(5, np.shape(carrier_3d)[2]):
+                    if carrier_3d[x, y, z] == 1:
+                        v, drt = v_all_drt(carrier_3d, potential_3d, x, y, z)#drt在这里暂时没用
+                        if v.sum() > 0:
+                            #print("I did find something useful!")
+                            rt_i = -math.log(random.random())/v.sum()/v0
+                            if rt_i < rt_min:
+                                rt_min = rt_i
+                                hop_ini = np.array([x, y, z], dtype = int)
     #print("signal2!!!!!!!!!!!!@!!!!!")
     #print(hop_site)
-    hop_ini += np.array([chunk_i*chunk, 0, t_ox])#返回的必须是真实的坐标
+    hop_ini += np.array([chunk_i*chunk, 0, 0])#返回的必须是真实的坐标
     return rt_min, hop_ini#这里只是为了返回跳跃的位置和停留时间
     #print("enter child process!!!")
-
+"""
 def bottom_hopping(carrier_3d, potential_3d):
     rt_min = 1000
     z = 0
@@ -235,6 +252,7 @@ def y_axis_hopping(carrier_3d, potential_3d):
                     hop_ini = np.array([x, y, z], dtype = int) 
     hop_ini += np.array([0, 0, t_ox])
     return rt_min, hop_ini
+"""
 #---------------------------------------------------------------------------#
 #In the end, only the minimum resident time and coresponding hopping site are 
 #recorded in site_record.
@@ -295,7 +313,7 @@ def solve_potential(len_x, len_y, len_z):
         potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
         i += 1
     set_boundary_pot(potential_2d)
-    show_mat(potential_2d)
+    #show_mat(potential_2d)
     update_pot(potential_2d, potential_3d)
     np.save('potential_3d' + '_' + str(len_x) + '_' 
             + str(len_y) + '_' + str(len_z) + '.npy', potential_3d)
@@ -309,13 +327,12 @@ if __name__=='__main__':
     time_counter = 0
     set_time = 10  #set the running time, 1000 times hopping
     current_counter = 0
-    cores = 2#mp.cpu_count()
     #-------------------------------------------------------------------#        
     carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
     carrier_3d[:, len_y-1, t_ox:len_z-1] = 1
     q_num = np.zeros((len_z, len_y))
     potential_2d, potential_3d = solve_potential(len_x, len_y, len_z)
-    visualize(carrier_3d)
+    #visualize(carrier_3d)
 #--------------------------------------------------------------------------#
     #start hopping
     while time_counter < set_time:# set the running time of the simulation
@@ -335,67 +352,17 @@ if __name__=='__main__':
         for i in range(cores):
             slice_of_carrier_3d = slice(i*chunk, 
                                         np.shape(carrier_3d)[0] if i == cores-1 else (i+1)*chunk+2)
-            p.apply_async(hopping_x_section, args=(i, chunk, carrier_3d[slice_of_carrier_3d, :, t_ox:], 
-                                                             potential_3d[slice_of_carrier_3d, :, t_ox:]), 
+            p.apply_async(hopping_x_section, args=(i, chunk, carrier_3d[slice_of_carrier_3d, :, :], 
+                                                             potential_3d[slice_of_carrier_3d, :, :]), 
                                             callback=paral_site_record)
         p.close()
         p.join()
         signal_1 = time.time()
         print("signal 1 %.4f"%(signal_1 - hop_begin))
-        #print("len of site_record: %d"%len(site_record))
-        #print("len of rt_record: %d"%len(rt_record))
-        #-------------------boundary computation-----------------------------#
-        #4个表面边界的停留时间计算
-        #top_c = carrier_3d[:, :, len_z-2:]
-        bottom_c = carrier_3d[:, :, t_ox: t_ox+2]
-        #left_c = carrier_3d[:, :2, :]
-        #right_c = carrier_3d[:, len_y-2:, :]
-        front_c = carrier_3d[len_x-2:, :, t_ox:]
-        back_c = carrier_3d[0:2, :, t_ox:]
-        y_axis_c = carrier_3d[:2, :, t_ox: t_ox+2]
-        boundary_carrier = [bottom_c, front_c, back_c, y_axis_c]
-        #top_p = potential_3d[:, :, len_z-2:]
-        bottom_p = potential_3d[:, :, t_ox: t_ox+2]
-        #left_p = potential_3d[:, :2, :]
-        #right_p = potential_3d[:, len_y-2:, :]
-        front_p = potential_3d[len_x-2:, :, t_ox:]
-        back_p = potential_3d[0:2, :, t_ox:]
-        y_axis_p = potential_3d[:2, :, t_ox: t_ox+2]
-        boundary_potential = [bottom_p, front_p, back_p, y_axis_p]
-        boundary_func = [bottom_hopping, front_hopping, back_hopping, y_axis_hopping]
-        p2 = Pool(processes=cores)
-        for i in range(len(boundary_carrier)):
-            p2.apply_async(boundary_func[i], args=(boundary_carrier[i], boundary_potential[i]), 
-                                            callback=paral_site_record)
-        p2.close()
-        p2.join()
-        signal_2 = time.time()
-        print("signal 2 %.4f"%(signal_2 - signal_1))
-        #print("len of site_record: %d"%len(site_record))
         rt_min = min(rt_record)
         hop_ini = site_record[rt_record.index(rt_min)]
-        #Above process finds the carrier that hops. 
-        #And the probabilities to all 26 directions respectively. 
-        #Yet we still need the hopping direction.
-        if hop_ini[2] == t_ox:
-            if hop_ini[0] == 0:
-                v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
-                                    hop_ini[0], hop_ini[1], hop_ini[2], boundary='y_axis', get_drt=True)
-            else:
-                v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
-                                        hop_ini[0], hop_ini[1], hop_ini[2], boundary='bottom', get_drt=True)
-        elif hop_ini[0] == len_x-1:
-            v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
-                                    hop_ini[0], hop_ini[1], hop_ini[2], boundary='front', get_drt=True)
-        elif hop_ini[0] == 0:
-            v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
-                                    hop_ini[0], hop_ini[1], hop_ini[2], boundary='back', get_drt=True)
-        else:
-            v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
+        v_hop, drt_hop = v_all_drt(carrier_3d, potential_3d, 
                                     hop_ini[0], hop_ini[1], hop_ini[2], get_drt=True)
-        #print("v_hop and drt_hop")
-        #print(v_hop)
-        #print(drt_hop)
         rdm2 = random.random()
         i = 0
         while i < len(v_hop):
@@ -433,10 +400,12 @@ if __name__=='__main__':
         carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Set the boundary again
         carrier_3d[:, 0, t_ox-1:len_z-1] = 0
         current = current_counter*q/sys_time 
+        """
         if time_counter == set_time - 1:
             #pot_record.append(potential_2d)
             show_mat(potential_2d)
-            visualize(carrier_3d)   
+            visualize(carrier_3d) 
+        """  
     #--------------------------------------------------------------------#
     end = time.time()
     print("Runtime: %0.4f"%(end - begin))
