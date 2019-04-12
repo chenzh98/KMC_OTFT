@@ -12,7 +12,7 @@ import time
 begin = time.time()
 sys_time = 0
 time_counter = 0
-set_time = 200  #set the running time, 1000 times hopping
+set_time = 5000000  #set the running time, 1000 times hopping
 current_counter = 0
 #-------------------------------------------------------------#
 #define the constants
@@ -209,16 +209,16 @@ while row < np.shape(para_mat)[0]:
             para_mat[row, i] = para_mat[row-1, i-1]
         row += 1
 pot_sol = solve(para_mat, pot_5544)
-i = 1
-while i < (len_z-1):
+for i in range(1, len_z-1):
     potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
-    i += 1
 potential_2d = boundary_pot(potential_2d)
-#show_mat(potential_2d)
+show_mat(potential_2d)
 #---------------------------------------------------------------------------------------------
-#visualize(carrier_3d)
+visualize(carrier_3d)
 potential_3d = update_pot(potential_2d, potential_3d)
 pot_record = []
+current_record = []
+time_record = []
 #start hopping
 while time_counter <= set_time:# set the running time of the simulation
     sys_time, hop_ini, hop_finl = hopping(sys_time, carrier_3d, potential_3d, (len_x, len_y, len_z, t_ox))
@@ -236,19 +236,38 @@ while time_counter <= set_time:# set the running time of the simulation
     if hop_finl[1] == 0:
         current_counter += 1
     carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Set the boundary again
-    carrier_3d[:, 0, t_ox-1:len_z-1] = 0
-    time_counter += 1
-    current = current_counter*q/sys_time 
-    if time_counter % 10 == 0:
-        print(time_counter)  
+    carrier_3d[:, 0, t_ox-1:len_z-1] = 0  
+    #current = current_counter*q/sys_time 
+    if time_counter % 100 == 0:
+        print(time_counter)
+    #---------record the current at the moment-------#
+    if time_counter % 5000 == 0:
+        crt_0 = current_counter
+        time_0 = sys_time
+    if time_counter % 5000 == 200:
+        crt_1 = current_counter
+        time_1 = sys_time
+        current_record.append((crt_1 - crt_0)/(time_1 - time_0))
+        time_record.append(time_counter - 200)       
+    #----------------------------------#
     if time_counter == set_time//10 \
     or time_counter == set_time//5 \
     or time_counter == set_time//2 \
     or time_counter == set_time - 1:
         pot_record.append(potential_2d)
-        #show_mat(potential_2d)
+        show_mat(potential_2d)
         #plt.savefig('potential'+ str(time_counter) + '.png')
-        #visualize(carrier_3d)
+        visualize(carrier_3d)
+        savenpy(carrier_3d, "carrier_3d", time_counter)
+        savenpy(potential_3d, "potential_3d", time_counter)
+#        savenpy(potential_2d, "potential_2d", time_counter)
+        savenpy(current_record, "current_record", time_counter)
+        savenpy(time_record, "time_record", time_counter)
+        diff_1 = abs(current_record[-1] - current_record[-2])/current_record[-2]
+        diff_2 = abs(current_record[-2] - current_record[-3])/current_record[-2]
+        if diff_1 < 0.02 and diff_2 <0.02:
+            break
+    time_counter += 1
 #--------------------------------------------------------------------#
 end = time.time()
 print("Runtime: %0.4f"%(end - begin))      
