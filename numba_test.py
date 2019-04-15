@@ -269,10 +269,10 @@ while time_counter <= set_time:# set the running time of the simulation
     if time_counter % 100 == 0:
         print(time_counter)
     #---------record the current at the moment-------#
-    if time_counter % 10000 == 0:
+    if time_counter % 100000 == 0:
         crt_0 = current_counter
         time_0 = sys_time
-    if time_counter % 10000 == 1000:
+    if time_counter % 100000 == 10000:
         crt_1 = current_counter
         time_1 = sys_time
         current_record.append((crt_1 - crt_0)/(time_1 - time_0))
@@ -283,7 +283,7 @@ while time_counter <= set_time:# set the running time of the simulation
     or time_counter == set_time//2 \
     or time_counter == set_time - 1:
 #        pot_record.append(potential_2d)
-        show_mat(potential_2d)
+        show_mat(potential_3d[15].T)
         #plt.savefig('potential'+ str(time_counter) + '.png')
         visualize(carrier_3d)
         savenpy(carrier_3d, "carrier_3d", time_counter)
