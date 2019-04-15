@@ -9,10 +9,11 @@ import random
 from scipy.linalg import solve
 from numba import njit
 import time
+data_path = 'D:\\pywork\\KMC\\data'
 begin = time.time()
 sys_time = 0
 time_counter = 0
-set_time = 5000000  #set the running time, 1000 times hopping
+set_time = 50 #set the running time, 1000 times hopping
 current_counter = 0
 #-------------------------------------------------------------#
 #define the constants
@@ -31,6 +32,8 @@ t_semi = 10
 len_x = 50 
 len_y = 50
 len_z = t_ox + t_semi
+vg = -10
+vd = -10
 #-------------------define functions-------------------------#
 def visualize(c_3d):
     x = []
@@ -59,6 +62,7 @@ def visualize(c_3d):
 def show_mat(Z):
     fig, ax = plt.subplots()
     im = ax.imshow(Z, origin='lower')
+    plt.colorbar(im, shrink=0.45)
     plt.show()
 #    plt.savefig('potential'+ str(time_counter) + '.png')
 def savenpy(arr, name, time_counter):
@@ -78,19 +82,20 @@ def boundary_pot(potential_2d):
     return potential_2d
 #---------------------------------------------------------------------#
 @njit
-def single_charge_pot(y, z):
-    potential = np.zeros((len_z, len_y))
-    for i in range(0, len_z):
-        for j in range(0, len_y):
-            if i == z and j == y:
-                potential[i, j] = 0
-            else:
-                if i <= 4:
-                    potential[i, j] = \
-                    q/(4*np.pi*epsilon0*epsilon_ox)/math.sqrt((i-z)**2+(j-y)**2)
+def single_charge_pot(x, y, z):
+    potential = np.zeros((len_x, len_y, len_z))
+    for i in range(0, len_x):
+        for j in range(1, len_y-1):
+            for k in range(0, len_z):
+                if i == x and j == y and k == z:
+                    potential[i, j, k] = 0
                 else:
-                    potential[i, j] = \
-                    q/(4*np.pi*epsilon0*epsilon_s)/math.sqrt((i-z)**2+(j-y)**2)
+                    if k < t_ox :
+                        potential[i, j, k] = \
+                        q/(4*np.pi*epsilon0*epsilon_ox)/math.sqrt((i-x)**2+(j-y)**2+(k-z)**2)
+                    else:
+                        potential[i, j, k] = \
+                        q/(4*np.pi*epsilon0*epsilon_s)/math.sqrt((i-x)**2+(j-y)**2+(k-z)**2)
     return potential
 #----------------------------------------------------------------------#
 #Hopping change carrier_3d and system time.
@@ -159,64 +164,85 @@ def hopping(sys_time, carrier_3d, potential_3d, constants):
         print("Error!")
     return sys_time, hop_ini, hop_finl                
 #-------------------------------------------------------------------#        
-carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
-potential_3d = np.zeros((len_x, len_y, len_z))
-potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num. For the convenience of computation below.
-q_num = np.zeros((len_z, len_y), dtype = int)
-# define the source/drain.
-#1 means a carrier occupied the lattice point. 0 means no carrier
-carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
 #Vd = -10V, Vs = 0, Vg = -10V, other boundary values are 0
 #Use finite difference to solve the potential(y,z)
 #Since the boundary potential is given, we need to calc a (30-2)x(200-2) matrix
-pot_5544 = np.zeros((len_z-2)*(len_y-2))#should be 5544, means 28*198 unknown
-para_mat = np.zeros(((len_z-2)*(len_y-2), (len_z-2)*(len_y-2)))#5544, 5544
-#solve initial potential
-for i in range(0, len_y-2):
-    pot_5544[i] = 10
-for j in range(t_ox-1, len_z-2, 1):
-    pot_5544[j*(len_y-2)] = 10
-row = 0
-while row < np.shape(para_mat)[0]:
-    dn = row // (len_y-2)
-    if row % (len_y-2) == 0:
-        para_mat[row, dn*(len_y-2)] = -4
-        para_mat[row, dn*(len_y-2)+1] = 1        
-        if dn > 0:
-            para_mat[row, (dn-1)*(len_y-2)] = 1
-        if dn < (len_z-3):
-            para_mat[row, (dn+1)*(len_y-2)] = 1
-        row += 1
-    elif row % (len_y-2) == 1:
-        para_mat[row, dn*(len_y-2)] = 1 
-        para_mat[row, dn*(len_y-2)+1] = -4
-        para_mat[row, dn*(len_y-2)+2] = 1        
-        if dn > 0:
-            para_mat[row, (dn-1)*(len_y-2)+1] = 1
-        if dn < (len_z-3):
-            para_mat[row, (dn+1)*(len_y-2)+1] = 1 
-        row += 1
-    elif row % (len_y-2) == (len_y-3):
-        para_mat[row, dn*(len_y-2)+(len_y-4)] = 1 
-        para_mat[row, dn*(len_y-2)+(len_y-3)] = -4
-        if dn > 0:
-            para_mat[row, (dn-1)*(len_y-2)+(len_y-3)] = 1
-        if dn < (len_z-3):
-            para_mat[row, (dn+1)*(len_y-2)+(len_y-3)] = 1 
-        row += 1
+def get_potential_BGBC(vg, vd, len_x, len_y, len_z, t_ox):
+    #solve initial potential
+    pot_5544 = np.zeros((len_z-2)*(len_y-2))#should be 5544, means 28*198 unknown
+    para_mat = np.zeros(((len_z-2)*(len_y-2), (len_z-2)*(len_y-2)))#5544, 5544
+    potential_2d = np.zeros((len_z, len_y))#z is the row num, y is the column num. For the convenience of computation below.
+    for i in range(0, len_y-2):
+        pot_5544[i] = -vg
+    for j in range(t_ox-1, len_z-2, 1):
+        pot_5544[j*(len_y-2)] = -vd
+    row = 0
+    while row < np.shape(para_mat)[0]:
+        dn = row // (len_y-2)
+        if row % (len_y-2) == 0:
+            para_mat[row, dn*(len_y-2)] = -4
+            para_mat[row, dn*(len_y-2)+1] = 1        
+            if dn > 0:
+                para_mat[row, (dn-1)*(len_y-2)] = 1
+            if dn < (len_z-3):
+                para_mat[row, (dn+1)*(len_y-2)] = 1
+            row += 1
+        elif row % (len_y-2) == 1:
+            para_mat[row, dn*(len_y-2)] = 1 
+            para_mat[row, dn*(len_y-2)+1] = -4
+            para_mat[row, dn*(len_y-2)+2] = 1        
+            if dn > 0:
+                para_mat[row, (dn-1)*(len_y-2)+1] = 1
+            if dn < (len_z-3):
+                para_mat[row, (dn+1)*(len_y-2)+1] = 1 
+            row += 1
+        elif row % (len_y-2) == (len_y-3):
+            para_mat[row, dn*(len_y-2)+(len_y-4)] = 1 
+            para_mat[row, dn*(len_y-2)+(len_y-3)] = -4
+            if dn > 0:
+                para_mat[row, (dn-1)*(len_y-2)+(len_y-3)] = 1
+            if dn < (len_z-3):
+                para_mat[row, (dn+1)*(len_y-2)+(len_y-3)] = 1 
+            row += 1
+        else:
+            for i in range(0, (len_z-2)*(len_y-2)):
+                para_mat[row, i] = para_mat[row-1, i-1]
+            row += 1
+    pot_sol = solve(para_mat, pot_5544)
+    for i in range(1, len_z-1):
+        potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
+    potential_2d = boundary_pot(potential_2d)
+    return potential_2d
+#-------------------------------------------------------------------------------#
+while True:
+    asw = input('Continue with last simulation? Y/N\n')
+    asw = asw.lower()
+    if asw == 'y':
+        time_counter = input('Please enter time_counter:')
+        carrier_3d = np.load('{}\\carrier_3d_{}.npy'.format(data_path, time_counter))
+        potential_3d = np.load('{}\\potential_3d_{}.npy'.format(data_path, time_counter))
+        time_counter = int(time_counter)
+        set_time = int(input('Please input set_time:'))
+        if set_time <= time_counter:
+            print("set_counter must be large than time_counter!")
+        else:
+            break
+    elif asw == 'n':
+        set_time = int(input('Please input set_time:'))
+        carrier_3d = np.zeros((len_x, len_y, len_z), dtype = int)
+        potential_3d = np.zeros((len_x, len_y, len_z))
+        #q_num = np.zeros((len_z, len_y), dtype = int)
+        # define the source/drain.
+        #1 means a carrier occupied the lattice point. 0 means no carrier
+        carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Source side 
+        potential_2d = get_potential_BGBC(vg, vd, len_x, len_y, len_z, t_ox)
+        potential_3d = update_pot(potential_2d, potential_3d)
+        show_mat(potential_2d)
+        break
     else:
-        for i in range(0, (len_z-2)*(len_y-2)):
-            para_mat[row, i] = para_mat[row-1, i-1]
-        row += 1
-pot_sol = solve(para_mat, pot_5544)
-for i in range(1, len_z-1):
-    potential_2d[i, 1:(len_y-1)] = pot_sol[(i-1)*(len_y-2):i*(len_y-2)]
-potential_2d = boundary_pot(potential_2d)
-show_mat(potential_2d)
-#---------------------------------------------------------------------------------------------
+        print("Not recognized input")
 visualize(carrier_3d)
-potential_3d = update_pot(potential_2d, potential_3d)
-pot_record = []
+#pot_record = []
 current_record = []
 time_record = []
 #start hopping
@@ -225,14 +251,16 @@ while time_counter <= set_time:# set the running time of the simulation
     hop_finl = hop_finl.astype(int)
     carrier_3d[hop_ini[0], hop_ini[1], hop_ini[2]] = 0
     carrier_3d[hop_finl[0], hop_finl[1], hop_finl[2]] = 1 
-    if (hop_finl[1]>0) and (hop_finl[2]<(len_z-1)) and (hop_finl[2]>(t_ox-1)):
-        q_num[hop_finl[2], hop_finl[1]] += 1
-        potential_2d += single_charge_pot(hop_finl[1], hop_finl[2])
-    if (hop_ini[1]<(len_y-1)) and (hop_ini[2]<(len_z-1)):
-        q_num[hop_ini[2], hop_ini[1]] -= 1
-        potential_2d -= single_charge_pot(hop_ini[1], hop_ini[2])
+    if hop_finl[1]>0:
+        #q_num[hop_finl[2], hop_finl[1]] += 1
+        potential_3d += single_charge_pot(hop_finl[0], hop_finl[1], hop_finl[2])
+    if hop_ini[1]<(len_y-1):
+        #q_num[hop_ini[2], hop_ini[1]] -= 1
+        potential_3d -= single_charge_pot(hop_ini[0], hop_ini[1], hop_ini[2])
+    """
     potential_2d = boundary_pot(potential_2d)
     potential_3d = update_pot(potential_2d, potential_3d)
+    """
     if hop_finl[1] == 0:
         current_counter += 1
     carrier_3d[:, len_y-1, t_ox-1:len_z-1] = 1 #Set the boundary again
@@ -241,10 +269,10 @@ while time_counter <= set_time:# set the running time of the simulation
     if time_counter % 100 == 0:
         print(time_counter)
     #---------record the current at the moment-------#
-    if time_counter % 5000 == 0:
+    if time_counter % 10000 == 0:
         crt_0 = current_counter
         time_0 = sys_time
-    if time_counter % 5000 == 200:
+    if time_counter % 10000 == 1000:
         crt_1 = current_counter
         time_1 = sys_time
         current_record.append((crt_1 - crt_0)/(time_1 - time_0))
@@ -254,7 +282,7 @@ while time_counter <= set_time:# set the running time of the simulation
     or time_counter == set_time//5 \
     or time_counter == set_time//2 \
     or time_counter == set_time - 1:
-        pot_record.append(potential_2d)
+#        pot_record.append(potential_2d)
         show_mat(potential_2d)
         #plt.savefig('potential'+ str(time_counter) + '.png')
         visualize(carrier_3d)
@@ -263,10 +291,11 @@ while time_counter <= set_time:# set the running time of the simulation
 #        savenpy(potential_2d, "potential_2d", time_counter)
         savenpy(current_record, "current_record", time_counter)
         savenpy(time_record, "time_record", time_counter)
-        diff_1 = abs(current_record[-1] - current_record[-2])/current_record[-2]
-        diff_2 = abs(current_record[-2] - current_record[-3])/current_record[-2]
-        if diff_1 < 0.02 and diff_2 <0.02:
-            break
+        if len(current_record) > 3:
+            diff_1 = abs(current_record[-1] - current_record[-2])/current_record[-2]
+            diff_2 = abs(current_record[-2] - current_record[-3])/current_record[-2]
+            if diff_1 < 0.02 and diff_2 <0.02:
+                break
     time_counter += 1
 #--------------------------------------------------------------------#
 end = time.time()
